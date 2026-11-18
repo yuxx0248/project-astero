@@ -2,14 +2,14 @@
 
 **Astero** is an always-on, voice-first personal AI portal inspired by the EVE Online exploration frigate. It uses a modular speech pipeline, name-only wake word **"Astero"**, music, conversation and an authenticated remote-agent bridge. ASUS A16 is a development workstation only.
 
-> **Status: scaffold / hardware discovery.** Plan A is the accepted target architecture, **not an implemented or validated audio system**. Neither Echo Dot 2 rooting/audio streaming nor Xeon Bluetooth output has been verified.
+> **Status: scaffold / hardware discovery.** Plan A is the accepted target architecture, **not an implemented or validated audio system**. The owner reports successful Echo Dot 2 rooting; audio capture/streaming and Xeon Bluetooth output remain unverified.
 
 ## Deployment priority (2026-11-18)
 
 ### Plan A — Xeon server-first (primary)
 
 ```text
-Echo Dot 2 (2016, root required; audio access unverified)
+Echo Dot 2 (2016, root reported successful; mic access unverified)
     -- Wi-Fi / LAN microphone audio -->
 Xeon server (Astero Core: wake/VAD/AEC/ASR/agent/Voice Bridge/TTS/music)
     -- USB Bluetooth adapter if needed / A2DP -->
@@ -22,7 +22,7 @@ Spherical Echo (exact Dot 4/5 model TBD; Bluetooth speaker, stock firmware)
 - Xeon has Realtek ALC887 analog output and NVIDIA HDMI audio, but **neither is used for Bluetooth playback**, nor do they provide Bluetooth radio. Detect existing controller first; buy a Linux-supported USB adapter **only if required**.
 - Approx. 3 m through a wall is promising for Bluetooth but requires actual reliability testing.
 - Name-only wake **"Astero"** on the Xeon initially, with a continuous local-network microphone stream. No "Hey Astero" prefix. Keep raw-audio retention disabled by default.
-- Existing Voice Bridge TTS integration remains a priority, pending repository/API audit.
+- Voice Bridge repository/API has been audited; reuse its local speech.cpp/Qwen3-TTS service and notification API via an Astero adapter, without copying the entire repository.
 - Echo microphone capture, LAN streaming, playback timing and AEC/barge-in are hard **P0 gates**, not promised features.
 
 ### Plan B — Raspberry Pi 4 (fallback; original architecture)
@@ -40,7 +40,7 @@ Use if Echo Dot 2 rooting/capture/streaming cannot be made reliable, or the serv
 - [Architecture & contracts / Plan A and Plan B](docs/ARCHITECTURE.md)
 - [Hardware decision record](docs/HARDWARE_DECISIONS_2026-11-18.md)
 - [Validation / P0 gates](docs/VALIDATION.md)
-- [Voice Bridge reuse](docs/VOICE_BRIDGE.md)
+- [Voice Bridge reuse audit and integration plan](docs/VOICE_BRIDGE.md)
 
 ## Development setup (dry-run only)
 
@@ -57,9 +57,9 @@ The demo only runs the control-plane state machine and dry-run gateway; it does 
 
 ## Phases
 
-1. **P0:** verify exact hardware models, Dot 2 exploit/firmware compatibility and recoverability, access to usable mic stream, Wi-Fi continuity, server Bluetooth A2DP, playback reference and AEC feasibility.
+1. **P0:** verify exact hardware models, Dot 2 post-root microphone access and recovery information, access to usable mic stream, Wi-Fi continuity, server Bluetooth A2DP, playback reference and AEC feasibility.
 2. **P1:** calibrate name-only wake model at 1–3 m; VAD, pre-roll, Mandarin/English ASR, false-awaken and latency trials.
-3. **P2:** audit/reuse Voice Bridge, streaming TTS, ducking, stop/barge-in, latency and fallback to half-duplex.
+3. **P2:** integrate audited Voice Bridge, then improve streaming TTS, ducking, stop/barge-in, latency and fallback to half-duplex.
 4. **P3:** secure Agent Gateway, progress/cancel/confirm and follow-up windows.
 5. **P4:** music integration, headless startup, reconnection and 24h reliability soak.
 
