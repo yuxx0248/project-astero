@@ -192,6 +192,35 @@ def quiet_echo_speaker():
             command('On')
 
 
+@contextmanager
+def paused_echo_mixer():
+    """Keep the stock mixer stopped across turns, then restore its prior state."""
+    def command(*args):
+        return subprocess.run(['adb', 'shell', *args], capture_output=True,
+                              text=True, timeout=5, check=True).stdout.strip()
+
+    def wait_for(expected):
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if command('getprop', 'init.svc.mixer') == expected:
+                return
+            time.sleep(0.1)
+        raise RuntimeError(f'Echo mixer 未进入 {expected} 状态')
+
+    state = command('getprop', 'init.svc.mixer')
+    if state not in ('running', 'stopped'):
+        raise RuntimeError(f'无法确认 Echo mixer 状态：{state!r}')
+    try:
+        if state == 'running':
+            command('setprop', 'ctl.stop', 'mixer')
+            wait_for('stopped')
+        yield
+    finally:
+        if state == 'running':
+            command('setprop', 'ctl.start', 'mixer')
+            wait_for('running')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Astero 本机语音助手')
     parser.add_argument('--channel', type=int, default=3, choices=range(7))
@@ -215,7 +244,8 @@ def main(argv=None):
         digest = hashlib.sha256(helper.read_bytes()).hexdigest()
         bridge = VoiceBridgeClient()
         bridge.health()
-        with SherpaOnnxASR(cfg, recognizer=SenseVoice(ROOT / 'models/sensevoice')) as recognizer:
+        with (SherpaOnnxASR(cfg, recognizer=SenseVoice(ROOT / 'models/sensevoice')) as recognizer,
+              quiet_echo_speaker(), paused_echo_mixer(), quiet_echo_speaker()):
             while True:
                 vad = SileroVAD(vad_path)
                 endpoint = EndpointCollector(vad, EndpointConfig(pre_roll_seconds=0,
@@ -224,12 +254,11 @@ def main(argv=None):
                                           config=OrchestratorConfig(max_listen_seconds=86400,
                                                                     playback_timeout_seconds=180))
                 with AdbCapture(helper, digest) as capture:
-                    with quiet_echo_speaker():
-                        frames = mono_frames(capture, args.channel, args.gain)
-                        first = next(frames)
-                        print('正在等待语音命令；Ctrl-C 停止。' if args.manual else
-                              '正在监听 Astero；Ctrl-C 停止。', flush=True)
-                        result = controller.run_once(chain((first,), frames))
+                    frames = mono_frames(capture, args.channel, args.gain)
+                    first = next(frames)
+                    print('正在等待语音命令；Ctrl-C 停止。' if args.manual else
+                          '正在监听 Astero；Ctrl-C 停止。', flush=True)
+                    result = controller.run_once(chain((first,), frames))
                 if result.status is TurnStatus.COMPLETED:
                     print('一轮语音交互完成。', flush=True)
                 else:
