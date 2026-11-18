@@ -1,42 +1,56 @@
-# Validation / gates
+# Validation & decision gates
 
-No hardware claims are verified yet. Keep evidence for the exact Pi OS/kernel, Bluetooth codecs, device models, audio routes and model versions.
+All audio paths remain **unverified**. The repo currently contains a dry-run scaffold only. Capture evidence with exact firmware/build versions, device IDs, commands and measured logs.
 
-## P0 — feasibility before investing in AI code
-- [ ] Record Pi 4 RAM variant, OS 64-bit, CPU temperature, audio server.
-- [ ] Identify Bluetooth microphone manufacturer/model and whether capture profile works.
-- [ ] Pair Echo as A2DP playback device; auto reconnect on boot.
-- [ ] **Simultaneously** record the BT microphone and play Echo music; confirm no device/profile conflict.
-- [ ] Capture local music playback reference, align with microphone track; measure Bluetooth delay and drift over 30 minutes.
-- [ ] Validate PipeWire echo-cancel plugin API and compare raw/AEC output while playing music.
-- [ ] If Bluetooth AEC cannot track, first test duck/pause-on-wake fallback; don't assume buying a new mic is necessary.
+## P0-A — server-first / Echo Dot 2 / spherical Echo
 
-## P1 — wake and endpoint
-- [ ] Obtain/train a name-only 'Astero' model using varied own utterances, multiple distances and music/noise negatives.
-- [ ] Quiet 1 m and 3 m: >=20 trials each; track true-positive, latency, false rejects.
-- [ ] Music normal volume 3 m: >=20 trials, 4h false wake soak.
-- [ ] Run ASR Mandarin / English sentences, record word errors and endpoint truncation.
-- [ ] Voice inactivity 5s, pause tolerance 1.5–3s, max turn 90s (tune experimentally).
+- [ ] Identify exact 2016 Echo Dot 2 hardware revision, firmware, recovery capability and suitable documented root route. Do not flash before backup/recovery review.
+- [ ] Verify root access in a controlled manner, without assuming a particular exploit works on current firmware.
+- [ ] Establish usable audio capture from Echo Dot 2; identify sample rate/channels/processing, and whether native array DSP/beamforming/AEC is actually available.
+- [ ] Choose/test a LAN streaming satellite protocol, persistent stream and auth. Log timestamp continuity, packet loss, gaps and reconnection.
+- [ ] Record Xeon OS/kernel, CPU, current Bluetooth controller (`bluetoothctl list`, `lsusb`) and BlueZ/PipeWire/ALSA state. Built-in sound card does **not** imply Bluetooth.
+- [ ] Identify spherical Echo generation; pair and play as Bluetooth A2DP sink without root. Test automated reconnect after host/Echo reboot.
+- [ ] If no server Bluetooth controller exists, explicitly evaluate a Linux-supported USB Bluetooth adapter; avoid premature purchase.
+- [ ] Measure stable A2DP reception across ~3 m and one wall, audio start latency, underruns, 30-min drift and wake/pause behavior.
+- [ ] Verify host playback PCM reference and align it with mic signal; measure AEC attenuation and clock/drift correction in TTS/music cases.
+- [ ] If AEC/barge-in is unreliable, prove duck/pause + half-duplex remains intelligible and does not self-trigger.
+- [ ] Measure LAN-added latency P95 (goal <50 ms) and post-wake-word feedback latency P95 (goal <500 ms). Treat as targets, not measured guarantees.
 
-## P2 — response
-- [ ] Discover existing Voice Bridge repository and audit license, dependencies, API, voice quality and ARM64 suitability.
-- [ ] Adapter sends sample text; speaker emits audible audio with no overlap corruption.
-- [ ] Duck/music restoration after reply, timeout, cancel and error.
-- [ ] Barge-in during TTS without self-trigger; fall back to half-duplex if unreliable.
+### Plan A go/no-go
 
-## P3 — agent
-- [ ] Mock agent accepted -> running -> completed transitions.
-- [ ] Error, timeout, cancel, confirmation required, follow-up within 10–15s.
-- [ ] No result is announced as finished before remote completion.
-- [ ] Authentication and privilege boundaries verified.
+**GO** only if rooted Echo Dot 2 provides sustainable microphone frames, Xeon-to-Echo playback survives reboots, name-only wake works and echo/self-trigger is acceptably controlled. **NO-GO -> Plan B** if capture/root fails, latency/dropouts unacceptable or audio suppression cannot be mitigated with half-duplex.
 
-## P4 — stability
-- [ ] Boot/headless startup, BT reconnect, 24-hour idle soak, network outage recovery.
-- [ ] CPU and memory use, audio xruns, per-phase latency, thermal throttling and power recorded.
-- [ ] No audio/content retention without opt-in.
+## P0-B — original Raspberry Pi 4 fallback
 
-## Decision gates
-- **Blocker:** Pi cannot simultaneously use BT microphone + Echo output; adapt routing or choose different already-owned device before buying.
-- **Blocker:** no accessible, independently running agent backend. In that case only local mock/music demo works.
-- **Risk:** Echo music started by Alexa itself lacks Pi playback reference for software AEC.
-- **Fallback:** lower/pause music, half-duplex; never silently claim full-duplex.
+- [ ] Record Pi RAM/OS/kernel, mic model/profile.
+- [ ] Pair existing Bluetooth microphone via HFP/HSP and spherical Echo via A2DP.
+- [ ] Confirm concurrent capture/playback without Bluetooth profile conflicts.
+- [ ] Measure playback-reference alignment, delay drift and duck/pause fallback.
+- [ ] Verify Pi reboot recovery, music and end-to-end round-trip.
+
+## P1 — wake, ASR and endpoint (on selected host)
+
+- [ ] Train/obtain **name-only "Astero"** wake model; no prefix. Calibrate varied speakers and noisy negatives.
+- [ ] Quiet 1 m/3 m >=20 trials per condition; report true positive, detection latency and misses.
+- [ ] Music 3 m >=20 trials plus >=4 h false-trigger soak.
+- [ ] Mandarin/English ASR metrics; turn-end truncation and follow-up checks.
+
+## P2 — reply and AEC
+
+- [ ] Discover/audit existing Voice Bridge API, deployment, license and audio format; integration adapter rather than blind code copy.
+- [ ] TTS Bluetooth playback and music duck/restore on completion/error/cancel.
+- [ ] Barge-in under TTS; ensure no self-wake; accept half-duplex fallback.
+
+## P3 — agent security
+
+- [ ] Accepted/running/completed/failed/cancel/confirmation task events.
+- [ ] No early success claims; authenticated transport and privilege guardrails.
+
+## P4 — reliability
+
+- [ ] Headless startup, reconnect on Wi-Fi/BT outage, 24h soak and thermal/CPU monitoring.
+- [ ] No raw-audio or transcript retention by default.
+
+## Procurement
+
+No microphone, speaker, HAT, DAC or Pi-based add-on purchases before P0. Only consider small USB Bluetooth dongle if needed after hardware inventory.
