@@ -20,6 +20,7 @@
 - [Architecture and integration contracts](docs/ARCHITECTURE.md)
 - [Risks, experiments and acceptance](docs/VALIDATION.md)
 - [Voice Bridge reuse decision](docs/VOICE_BRIDGE.md)
+- [Hardware decisions — 2026-11-18](docs/HARDWARE_DECISIONS_2026-11-18.md)
 
 ## Development setup (dry-run, no audio hardware required)
 
