@@ -1,0 +1,36 @@
+{
+  "assistant_name": "Astero",
+  "wake_phrase": "Astero",
+  "audio": {
+    "input_device": null,
+    "output_device": null,
+    "backend": "unconfigured",
+    "aec_enabled": false,
+    "playback_reference": "unconfigured"
+  },
+  "wake": {
+    "engine": "unconfigured",
+    "model_path": null,
+    "threshold": 0.5
+  },
+  "vad": {
+    "speech_wait_seconds": 5,
+    "endpoint_silence_seconds": 1.5,
+    "max_utterance_seconds": 90
+  },
+  "conversation": {
+    "follow_up_seconds": 12
+  },
+  "agent": {
+    "mode": "dry_run",
+    "endpoint": null
+  },
+  "tts": {
+    "backend": "null",
+    "voice_bridge_endpoint": null
+  },
+  "music": {
+    "backend": "null",
+    "duck_percent": 25
+  }
+}
