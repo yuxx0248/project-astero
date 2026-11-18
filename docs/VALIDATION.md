@@ -1,11 +1,11 @@
 # Validation & decision gates
 
-All audio paths remain **unverified**. The repo currently contains a dry-run scaffold only. Capture evidence with exact firmware/build versions, device IDs, commands and measured logs.
+Echo Dot 2 root is **reported successful by the owner**; microphone capture and all end-to-end audio paths remain **unverified**. The repo currently contains a dry-run scaffold only. Capture evidence with exact firmware/build versions, device IDs, commands and measured logs.
 
 ## P0-A — server-first / Echo Dot 2 / spherical Echo
 
 - [ ] Identify exact 2016 Echo Dot 2 hardware revision, firmware, recovery capability and suitable documented root route. Do not flash before backup/recovery review.
-- [ ] Verify root access in a controlled manner, without assuming a particular exploit works on current firmware.
+- [x] Owner reports Echo Dot 2 root succeeded (self-report only; record build/device evidence and recovery path before modifying further).
 - [ ] Establish usable audio capture from Echo Dot 2; identify sample rate/channels/processing, and whether native array DSP/beamforming/AEC is actually available.
 - [ ] Choose/test a LAN streaming satellite protocol, persistent stream and auth. Log timestamp continuity, packet loss, gaps and reconnection.
 - [ ] Record Xeon OS/kernel, CPU, current Bluetooth controller (`bluetoothctl list`, `lsusb`) and BlueZ/PipeWire/ALSA state. Built-in sound card does **not** imply Bluetooth.
@@ -37,7 +37,13 @@ All audio paths remain **unverified**. The repo currently contains a dry-run sca
 
 ## P2 — reply and AEC
 
-- [ ] Discover/audit existing Voice Bridge API, deployment, license and audio format; integration adapter rather than blind code copy.
+- [x] Source audit complete: [Voice Bridge assessment](VOICE_BRIDGE.md) documents API, model, deployment and no root LICENSE found; redistribution/license confirmation still required.
+- [ ] Rebuild pinned speech.cpp for x86-64 Xeon and verify 1.7B Q8 GGUF hash; measure Xeon RSS, throughput, first-audio latency.
+- [ ] Exercise loopback-only Bridge /health, /announce (202 queued), /announcements/{id} through completed or failed; do not equate 202 with completed.
+- [ ] Validate PipeWire/paplay -> spherical Echo A2DP, including headless login/user-service lifecycle and reconnect.
+- [ ] Implement Astero VoiceBridgeSpeaker adapter with bounded status polling, playback lifecycle and failure handling.
+- [ ] Basic Echo-mic -> LAN -> ASR -> fixed text -> Bridge -> Bluetooth Echo closed-loop (initially no wake or agent).
+- [ ] For interactive mode: add cancellation, priority, low-latency/chunked synthesis where supported; preserve FIFO notifications API.
 - [ ] TTS Bluetooth playback and music duck/restore on completion/error/cancel.
 - [ ] Barge-in under TTS; ensure no self-wake; accept half-duplex fallback.
 
