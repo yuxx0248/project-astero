@@ -1,33 +1,38 @@
 # Hardware decision record — 2026-11-18
 
-Status: **Decision accepted; no purchases for MVP.**
+**Status: architecture reprioritized, implementation unverified.** This record supersedes the earlier Pi-first decision in this file. No new microphone/speaker purchases authorized.
 
-## Final current direction
-- **Raspberry Pi 4 is the always-on Astero voice portal.** ASUS A16 is used only to develop/test/deploy, never required to stay powered on.
-- **MVP microphone:** reuse the Bluetooth microphone already owned. Model/profile and simultaneous input capability need verification.
-- **MVP speaker:** reuse existing spherical Amazon Echo as an external Bluetooth speaker. Echo's internal microphone and Alexa processing are not available to the Pi over ordinary Bluetooth.
-- **Audio input/output:** BT microphone input + Echo A2DP output, if Pi/BlueZ/PipeWire support the two simultaneously. Verify codec, routing, reconnect and stability in P0.
-- **AEC:** software first, on Pi, using an actual playback reference from music/TTS emitted by Pi. Bluetooth latency, drift and variable buffering are a major unverified risk. Falling back to music duck/pause and half-duplex is acceptable for MVP.
-- **Wake name:** exactly **"Astero"**, no "Hey" prefix. Train/calibrate name-only wake model.
-- **Other features unchanged:** VAD intelligent end-of-turn, local lightweight ASR/TTS where practical, music playback and ducking, follow-up conversations, remote Agent Gateway, background task status, speech replies, privacy and tool confirmation.
-- **Existing Voice Bridge:** prioritize reuse of its TTS when repository can be identified and audited; do not copy unverified code.
+## Plan A — primary: Xeon server-first
 
-## Final physical-product direction (later, not MVP)
-- Keep the **speaker external**. Do not build a custom Hi-Fi speaker chamber, amp or crossover into the Astero box. A high-quality external Bluetooth or wired powered speaker may be substituted later.
-- A compact **3D-printed case for Pi + microphone array + optional status LED / mute switch** is an attractive next-stage design; keep microphone acoustically isolated from fans, vibration and speaker surfaces.
-- Possible post-MVP GPIO/I²S microphone: ReSpeaker 2-Mics Pi HAT V2 (~$12.90 previously observed, not a committed purchase or guaranteed current price); 4-mic options only if 3 m/music tests justify them. Old HAT overlay/driver support must be verified against chosen Pi OS/kernel.
-- **No extra sound card / DAC now.** Bluetooth is digital on both sides. Only consider a DAC if a future wired analog active speaker requires it; passive loudspeakers require amplification, not merely a DAC.
-- Avoid assuming I²S mic HAT and I²S amplifier can be installed together without pin/clock/device-tree conflict, but this is out of scope since speakers remain external.
+- Always-on Xeon server runs Astero Core (name-only wake "Astero", VAD, ASR, music/mixer, Voice Bridge TTS adapter, authenticated Agent Gateway); A16 is dev-only, Raspberry Pi 4 **not required**.
+- Existing **Echo Dot 2 (2016)** is a **candidate** rooted microphone satellite communicating with Xeon through Wi-Fi. Root access, access to processed mic array audio, stable capture and LAN streaming are **unverified**; hardware/firmware specific verification is mandatory.
+- Existing spherical Echo is Bluetooth **speaker only**, no root required. It is believed to be a small Dot 4/5 but exact generation must be verified. We are not relying on its microphone.
+- Xeon and output Echo are approximately **3 m apart through one wall**; test Bluetooth signal quality, buffering and auto-reconnect.
+- Xeon has **Realtek ALC887-VD analog audio** and **NVIDIA GTX 970 GM204 HDA HDMI audio**. These are not needed for Wi-Fi mic + A2DP speaker; they do not establish presence of a Bluetooth controller. Inventory first and use a USB Bluetooth adapter only if needed.
+- Pi-to-Echo Bluetooth audio output is replaced with server-to-Echo Bluetooth A2DP in Plan A. Server playback reference can feed AEC, but independent microphone and speaker clocks/BT delay are major challenges.
+- Initial wake detection should run on Xeon over a continuous LAN microphone stream. **Wake word = "Astero" alone**, not "Hey Astero".
+- Prefer reusing Voice Bridge's working TTS via a verified interface rather than copying unknown source code.
+- Initial hardware procurement: **none**, except optional USB Bluetooth dongle after confirming the server lacks Bluetooth.
 
-## P0 feasibility questions
-1. Can Pi simultaneously capture the existing Bluetooth microphone and send quality music to the Echo without conflict?
-2. Can PipeWire provide properly synchronized output-reference frames to a software echo canceller despite Echo Bluetooth playback delay/drift?
-3. Does single-word Astero reliably trigger at 1 m and 3 m in quiet and with music? How many false triggers in a long music/podcast soak?
-4. Can music volume be ducked/restored transactionally? Are BT devices reconnected on reboot?
-5. Is the independently available backend Agent reachable when A16 is off? Can the TTS Voice Bridge be reused on Pi or by network service?
+## Plan B — retained original Raspberry Pi 4 setup
 
-## Procurement rule
-**Do not purchase microphones, speaker units, amplifiers, DACs, dedicated sound cards, or HATs for MVP.** Reconsider only after measured P0/P1 failures.
+- Pi 4 is the always-on portal; existing Bluetooth microphone is input, spherical Echo via Bluetooth A2DP is output.
+- Pi runs modular wake/VAD/ASR/AEC/mixer/controller and routes heavy agent work elsewhere.
+- Original risk remains: two Bluetooth input/output profiles in parallel, variable latency and AEC timing. Validate before promoting fallback.
+- Preserve ability to use an independent microphone/HAT later if all already-owned hardware options fail; no new equipment now.
 
-## Build status
-Existing repo code is a **dry-run control-plane scaffold**, not a working audio assistant. This decision log does not claim that AEC, wake, bluetooth routing, ASR, TTS or music have been implemented.
+## Longer-term product direction
+
+Separate external speaker, no custom Hi-Fi speaker/amp enclosure. A custom 3D-printed terminal shell and GPIO/I²S microphone array remain optional **future** directions, not dependencies. No separate sound card or DAC required for current wireless Plan A.
+
+## Decision gates
+
+1. Confirm exact Echo devices, server OS, Bluetooth controller and root/firmware compatibility.
+2. Prove Dot 2 microphone capture with appropriate signal processing, continuous Wi-Fi transport and safe recovery path.
+3. Prove Xeon Bluetooth output to spherical Echo through wall, startup and reconnection.
+4. Measure self-echo/AEC, wake latency, music ducking, interruption and 24h stability.
+5. If Plan A fails, switch to preserved Pi-first Plan B; do not assume Plan B's concurrent Bluetooth I/O is already working.
+
+## Implementation status
+
+Only dry-run software scaffolding exists. No hardware root, AEC, wake, TTS, Bluetooth or audio streaming functionality is claimed implemented.
