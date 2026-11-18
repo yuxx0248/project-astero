@@ -15,7 +15,7 @@ Echo Dot 2 -- Wi-Fi PCM/Opus (protocol TBD) --> network capture adapter
 
 The always-on Xeon server hosts Astero Core. Neither the Raspberry Pi 4 nor ASUS A16 is in the runtime path. Existing Xeon ALC887/GTX970 HDMI sound hardware is irrelevant for Bluetooth playback; USB Bluetooth **radio**, if missing, is a separate peripheral. Server OS, BlueZ/PipeWire availability, Bluetooth controller and spherical Echo generation are to be confirmed.
 
-The Echo Dot 2 (2016) is a candidate **rooted Wi-Fi microphone satellite**, not a normal USB microphone. Root or alternate firmware access does **not** prove Linux capture access to seven channels, Amazon beamforming/AEC, always-on streaming or controllable local wake engine. An audio satellite agent/protocol requires selection and measured compatibility before implementation. No arbitrary wake word support is presumed on Echo; run the name-only wake model on Xeon first.
+The Echo Dot 2 (2016) has **owner-reported successful root** and is a candidate Wi-Fi microphone satellite, not a normal USB microphone. Root or alternate firmware access does **not** prove Linux capture access to seven channels, Amazon beamforming/AEC, always-on streaming or controllable local wake engine. An audio satellite agent/protocol requires selection and measured compatibility before implementation. No arbitrary wake word support is presumed on Echo; run the name-only wake model on Xeon first.
 
 For low perceived wake latency, establish a persistent LAN stream, bounded jitter buffering and ~0.5–1 s pre-roll. Track mic timestamps, dropout, end-to-end delays and Wi-Fi reconnect. Network proximity is favorable but cannot substitute for measurements.
 
@@ -39,7 +39,7 @@ Preserved as the explicit fallback if Echo Dot 2 root/audio streaming fails, ser
 - **VAD/endpoint:** streaming pre-roll; approximately 5 s speech wait, 1.5–3 s pause tolerance and configurable max duration are starting points.
 - **ASR:** Mandarin/English-capable local engine on selected host where feasible; offline processing preferred.
 - **Router/agent:** safe local commands or authenticated agent gateway; task IDs and truthful completion.
-- **TTS:** external Voice Bridge adapter if verified, otherwise local TTS; support cancellation and music ducking.
+- **TTS:** [Voice Bridge audited](VOICE_BRIDGE.md): localhost-only HTTP notification API, Qwen3-TTS via speech.cpp, full-WAV-before-paplay, asynchronous 202 queued and status polling. Reuse separate service via adapter; completed only after playback process success. Streaming, per-job cancellation, priority and music ducking are future work. Keep notification API unchanged.
 - **Speaker transport:** BlueZ A2DP on Plan A Xeon or Plan B Pi. Verify echo speaker pairing/reconnect and current firmware behavior.
 - **Music:** host-generated playback for a reference signal; music independently played by Alexa cannot be reliably cancelled with the host reference.
 
@@ -48,7 +48,7 @@ Preserved as the explicit fallback if Echo Dot 2 root/audio streaming fails, ser
 ```text
 WakeDetector.detect(frame) -> bool
 SpeechRecognizer.transcribe(audio) -> str
-Speaker.speak(text) -> None
+Speaker.speak(text) -> None  # dry-run/synchronous contract; real async playback lifecycle requires extension
 AgentGateway.submit(text, session_id) -> TaskReceipt
 MusicController.duck()/restore()
 ```
