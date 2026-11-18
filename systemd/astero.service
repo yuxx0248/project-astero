@@ -1,0 +1,13 @@
+[Unit]
+Description=Astero Voice Portal (scaffold; demo mode only)
+After=network-online.target bluetooth.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/project-astero
+ExecStart=%h/project-astero/.venv/bin/python -m astero --config configs/astero.example.json --demo
+# Do not enable for 24/7 use until real microphone service is implemented.
+
+[Install]
+WantedBy=default.target
