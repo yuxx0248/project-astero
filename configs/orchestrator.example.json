@@ -1,0 +1,6 @@
+{
+  "session_id": "astero-local",
+  "max_listen_seconds": 120.0,
+  "playback_timeout_seconds": 120.0,
+  "playback_poll_seconds": 0.1
+}

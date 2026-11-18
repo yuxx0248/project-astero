@@ -1,0 +1,9 @@
+{
+  "backend": "openai_compatible",
+  "endpoint_env": "ASTERO_LLM_ENDPOINT",
+  "model_env": "ASTERO_LLM_MODEL",
+  "api_key_env": "ASTERO_LLM_API_KEY",
+  "timeout_seconds_env": "ASTERO_LLM_TIMEOUT_SECONDS",
+  "system_prompt_env": "ASTERO_LLM_SYSTEM_PROMPT",
+  "max_history_turns": 8
+}

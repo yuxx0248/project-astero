@@ -1,3 +1,11 @@
+# 本机 Voice Bridge 更新 — 2026-11-18
+
+当前阶段已改为先在 USB 连接 Echo Dot 2 的本机测试，不依赖 Xeon。真实设备已通过 ADB 验证 root、PCM 采集和一次合成语音声学回路；Voice Bridge 在本机健康运行。具体实现、结果和仍未验证的唤醒可靠性见 [本机语音回路说明](LOCAL_LIVE_RUN.md)。
+
+以下远端审核记录保留其原有的 Xeon 长期部署背景和当时的状态；其中“仅用户报告 root”“未确认 PCM”等表述是审核时点的历史记录，不代表本机当前状态。
+
+---
+
 # Voice Bridge audit and Astero integration decision — 2026-11-18
 
 **Source reviewed:** [yuxx0248/voice-bridge](https://github.com/yuxx0248/voice-bridge), default branch `main`; implementation in `voice_bridge/__main__.py`, `README.md`, `docs/deployment.md`, `docs/experiments.md`, `tests/test_bridge.py`, `deploy/systemd/*.service`. This supersedes the previous "repository not found" placeholder.

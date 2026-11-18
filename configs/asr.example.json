@@ -1,0 +1,12 @@
+{
+  "backend": "sherpa_onnx_zipformer",
+  "sample_rate": 16000,
+  "provider": "cpu",
+  "num_threads": 2,
+  "timeout_seconds": 20,
+  "model_dir": "~/.local/share/astero/models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20",
+  "encoder": "encoder-epoch-99-avg-1.int8.onnx",
+  "decoder": "decoder-epoch-99-avg-1.int8.onnx",
+  "joiner": "joiner-epoch-99-avg-1.int8.onnx",
+  "tokens": "tokens.txt"
+}

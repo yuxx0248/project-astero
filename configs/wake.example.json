@@ -1,0 +1,10 @@
+{
+  "engine": "openwakeword",
+  "model_path": "/home/zuohang/.local/share/astero/astero.tflite",
+  "sample_rate": 16000,
+  "chunk_ms": 80,
+  "threshold": 0.5,
+  "consecutive_frames": 2,
+  "refractory_seconds": 1.5,
+  "pre_roll_seconds": 0.5
+}
