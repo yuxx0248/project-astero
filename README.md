@@ -1,30 +1,50 @@
 # Project Astero
 
-**Astero** is a Raspberry Pi 4-based, always-on, voice-first personal AI portal inspired by the EVE Online exploration frigate. It is a self-hosted smart-speaker experience: music, a name-only wake word ("Astero"), spoken conversations, and a bridge to remote agents. The ASUS A16 is a **development workstation only**.
+**Astero** is an always-on, voice-first personal AI portal inspired by the EVE Online exploration frigate. It uses a modular speech pipeline, name-only wake word **"Astero"**, music, conversation and an authenticated remote-agent bridge. ASUS A16 is a development workstation only.
 
-> **Status: scaffold / hardware discovery.** No real wake detection, AEC, ASR, Bluetooth audio, music playback, or voice synthesis is claimed operational yet.
+> **Status: scaffold / hardware discovery.** Plan A is the accepted target architecture, **not an implemented or validated audio system**. Neither Echo Dot 2 rooting/audio streaming nor Xeon Bluetooth output has been verified.
 
-## Non-negotiable MVP constraints
+## Deployment priority (2026-11-18)
 
-- No new hardware purchases. Reuse a **Bluetooth microphone** and an existing **spherical Amazon Echo** as Bluetooth speaker.
-- Raspberry Pi 4 stays on 24/7. A16 is *not* a runtime dependency.
-- One room, approximately 3 m pickup range, including music playback.
-- Say **"Astero" alone**, never "Hey Astero". Name-only custom wake model to be trained and calibrated.
-- Prefer on-Pi wake detection, voice activity detection, ASR and speech output when performance permits. Offload LLM reasoning / coding agent execution to an independently available service.
-- Pi controls playback so echo cancellation has access to playback-reference audio. Spotify Connect via librespot/Raspotify is a possible integration.
-- Reuse an existing **Voice Bridge** TTS capability if compatible; its repository has not yet been identified or audited.
+### Plan A — Xeon server-first (primary)
+
+```text
+Echo Dot 2 (2016, root required; audio access unverified)
+    -- Wi-Fi / LAN microphone audio -->
+Xeon server (Astero Core: wake/VAD/AEC/ASR/agent/Voice Bridge/TTS/music)
+    -- USB Bluetooth adapter if needed / A2DP -->
+Spherical Echo (exact Dot 4/5 model TBD; Bluetooth speaker, stock firmware)
+```
+
+- Reuse existing always-on Xeon compute; **Pi 4 is not in Plan A's runtime path**.
+- Echo Dot 2 is intended as a microphone satellite, not a high-quality speaker. Its seven-mic array and stock processing **must not be assumed accessible after root**.
+- The spherical Echo is output only, with no root required. Verify Bluetooth receiver pairing, reconnect and playback. If it's a Dot 4/5, its 3.5mm port is not an AUX input.
+- Xeon has Realtek ALC887 analog output and NVIDIA HDMI audio, but **neither is used for Bluetooth playback**, nor do they provide Bluetooth radio. Detect existing controller first; buy a Linux-supported USB adapter **only if required**.
+- Approx. 3 m through a wall is promising for Bluetooth but requires actual reliability testing.
+- Name-only wake **"Astero"** on the Xeon initially, with a continuous local-network microphone stream. No "Hey Astero" prefix. Keep raw-audio retention disabled by default.
+- Existing Voice Bridge TTS integration remains a priority, pending repository/API audit.
+- Echo microphone capture, LAN streaming, playback timing and AEC/barge-in are hard **P0 gates**, not promised features.
+
+### Plan B — Raspberry Pi 4 (fallback; original architecture)
+
+```text
+Existing Bluetooth microphone -- BT input --> Pi 4 (wake/VAD/AEC/ASR/router/TTS)
+    -- Bluetooth A2DP --> spherical Echo speaker
+```
+
+Use if Echo Dot 2 rooting/capture/streaming cannot be made reliable, or the server-first deployment fails its operational gates. Maintain original constraints: no new audio hardware purchases for initial testing, reuse Voice Bridge if verified, test simultaneous Bluetooth capture/playback, and offload remote agents as necessary.
 
 ## Read first
 
 - [Product requirements](docs/PRODUCT.md)
-- [Architecture and integration contracts](docs/ARCHITECTURE.md)
-- [Risks, experiments and acceptance](docs/VALIDATION.md)
-- [Voice Bridge reuse decision](docs/VOICE_BRIDGE.md)
-- [Hardware decisions — 2026-11-18](docs/HARDWARE_DECISIONS_2026-11-18.md)
+- [Architecture & contracts / Plan A and Plan B](docs/ARCHITECTURE.md)
+- [Hardware decision record](docs/HARDWARE_DECISIONS_2026-11-18.md)
+- [Validation / P0 gates](docs/VALIDATION.md)
+- [Voice Bridge reuse](docs/VOICE_BRIDGE.md)
 
-## Development setup (dry-run, no audio hardware required)
+## Development setup (dry-run only)
 
-Requires Python >= 3.11. The scaffold uses only Python's standard library.
+Requires Python >= 3.11; existing scaffold uses standard library only.
 
 ```sh
 python3 -m venv .venv
@@ -33,19 +53,19 @@ python -m unittest discover -s tests -v
 python -m astero --config configs/astero.example.json --demo
 ```
 
-The demo exercises the state machine and a **dry-run** command gateway; it does **not** activate microphones, execute arbitrary shell commands or send tasks over the network.
+The demo only runs the control-plane state machine and dry-run gateway; it does not capture microphone input, synthesize speech or execute real agent actions. Current example configuration may reflect the original Pi scaffold and is **not** a working Xeon configuration.
 
-## Planned phases
+## Phases
 
-1. **P0 Audio feasibility:** enumerate BT microphone input and Echo output independently, pair/reconnect, capture playback reference, measure latency and echo cancel feasibility.
-2. **P1 Wake & capture:** name-only custom wake model, VAD and end-of-turn, audio pre-roll, false-trigger measurements.
-3. **P2 Speech round-trip:** local ASR; existing Voice Bridge TTS adapter (if confirmed), fallback local TTS; safe playback and music ducking.
-4. **P3 Agent:** authenticated transport, progress/cancel/confirm events, follow-up window, long-running task management.
-5. **P4 Music & reliability:** Spotify Connect, stable simultaneous listening, reconnect and reboot recovery, 24h soak.
+1. **P0:** verify exact hardware models, Dot 2 exploit/firmware compatibility and recoverability, access to usable mic stream, Wi-Fi continuity, server Bluetooth A2DP, playback reference and AEC feasibility.
+2. **P1:** calibrate name-only wake model at 1–3 m; VAD, pre-roll, Mandarin/English ASR, false-awaken and latency trials.
+3. **P2:** audit/reuse Voice Bridge, streaming TTS, ducking, stop/barge-in, latency and fallback to half-duplex.
+4. **P3:** secure Agent Gateway, progress/cancel/confirm and follow-up windows.
+5. **P4:** music integration, headless startup, reconnection and 24h reliability soak.
 
-## Safety/privacy
+## Privacy/security
 
-Default-deny privileged operations; require confirmation for destructive actions. Avoid retaining raw audio by default. Do not expose agent execution on the LAN without authentication. Never claim success based only on a dispatched request.
+Rooting any Echo may void support or brick the device. Follow hardware/firmware-specific verified procedures and preserve a recovery path; never assume all stock acoustic DSP features survive. Use authenticated service endpoints, default-deny dangerous actions, and avoid retaining voice data unless explicitly enabled.
 
 ## Attribution
 
