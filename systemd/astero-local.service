@@ -1,0 +1,16 @@
+[Unit]
+Description=Project Astero resident voice service
+After=voice-bridge.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/project-astero
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/share/astero/venv/bin/python -m astero.service --port 8766 --channel 6 --wake-secondary-channel 5 --end-silence 0.8 --listen --session-id local-voice
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=240
+UMask=0077
+
+[Install]
+WantedBy=default.target

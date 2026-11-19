@@ -12,6 +12,7 @@ import hashlib
 import os
 from pathlib import Path
 import subprocess
+import threading
 import time
 from typing import BinaryIO, Iterator, Protocol
 import uuid
@@ -93,6 +94,9 @@ class AdbCapture:
         self._proc: subprocess.Popen[bytes] | None = None
         self._sequence = 0
         self._closed = False
+        self._reader_thread_id: int | None = None
+        self._reader_done = threading.Event()
+        self._reader_done.set()
 
     def _adb(self, *args: str, timeout: float | None = None, check: bool = True):
         command = [self.adb]
@@ -140,10 +144,10 @@ class AdbCapture:
                 self._shell("setprop ctl.stop mixer")
                 self._wait_mixer("stopped")
             self._proc = self._popen(
-                # adb exec-out merges the Android process' stderr into its
-                # stdout. Linker diagnostics would corrupt PCM frame alignment.
-                # Exit status still reports helper failures to the host.
-                self._adb_args("exec-out", f"exec {self._remote} {self.device} {self.pcm} 2>/dev/null"),
+                # -T disables PTY byte transformations and forwards stdin so
+                # q reaches the helper. exec-out on this device loses stdin.
+                # Suppress remote linker stderr to protect PCM alignment.
+                self._adb_args("shell", "-T", f"exec {self._remote} {self.device} {self.pcm} 2>/dev/null"),
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0,
             )
             return self
@@ -158,8 +162,19 @@ class AdbCapture:
         return command + list(args)
 
     def frames(self) -> Iterator[AudioFrame]:
+        # A running producer must finish reading buffered stdout before close
+        # closes the pipe. An unstarted generator never marks a reader active.
         if self._proc is None or self._proc.stdout is None or self._closed:
             raise CaptureError("capture is not active")
+        self._reader_thread_id = threading.get_ident()
+        self._reader_done.clear()
+        try:
+            yield from self._read_frames()
+        finally:
+            self._reader_done.set()
+            self._reader_thread_id = None
+
+    def _read_frames(self) -> Iterator[AudioFrame]:
         size = self.frame_samples * CHANNELS * BYTES_PER_SAMPLE
         stream: BinaryIO = self._proc.stdout
         while True:
@@ -167,6 +182,17 @@ class AdbCapture:
             while len(chunk) < size:
                 part = stream.read(size - len(chunk))
                 if not part:
+                    if self._closed and self._proc.poll() in (None, 0):
+                        if chunk and len(chunk) % (CHANNELS * BYTES_PER_SAMPLE) == 0:
+                            # Device writes 256-sample blocks, while host frames
+                            # default to 160. A clean stop can leave a short but
+                            # complete group of interleaved samples: retain it.
+                            self._sequence += 1
+                            yield AudioFrame(time.monotonic_ns(), SAMPLE_RATE, CHANNELS,
+                                             SAMPLE_FORMAT, self._sequence, bytes(chunk))
+                            return
+                        if not chunk:
+                            return
                     if chunk:
                         raise CaptureError(
                             f"capture ended mid-frame ({len(chunk)} of {size} bytes); frame dropped"
@@ -205,12 +231,17 @@ class AdbCapture:
                 try:
                     self._proc.wait(timeout=2)
                 except subprocess.TimeoutExpired:
+                    errors.append("capture helper did not acknowledge stop")
                     self._proc.terminate()
                     try:
                         self._proc.wait(timeout=2)
                     except subprocess.TimeoutExpired:
                         self._proc.kill()
                         self._proc.wait(timeout=2)
+            reader = self._reader_thread_id
+            if reader is not None and reader != threading.get_ident():
+                if not self._reader_done.wait(timeout=2):
+                    errors.append("capture reader did not finish draining stdout")
             if self._proc.stdout:
                 self._proc.stdout.close()
             if self._proc.stderr:

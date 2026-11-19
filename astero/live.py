@@ -6,11 +6,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
 from contextlib import contextmanager
 from itertools import chain
 
@@ -20,98 +18,11 @@ from astero.orchestrator import Orchestrator, OrchestratorConfig, TurnStatus
 from astero.speech.asr import SherpaOnnxASR, ZipformerConfig
 from astero.speech.endpoint import EndpointCollector, EndpointConfig
 from astero.speech.voice_bridge import VoiceBridgeClient
+from astero.agent.codex_voice import CodexConversation
+from astero.speech.live_wake import Detected, SherpaKeyword
+from astero.speech.live_vad import SileroVAD
 
 ROOT = Path.home() / '.local/share/astero'
-
-
-@dataclass(frozen=True)
-class Detected:
-    timestamp: float
-    score: float | None = None
-
-
-class SherpaKeyword:
-    """Open-vocabulary phoneme keyword spotter, configured only for Astero."""
-    def __init__(self, model_dir: Path, keywords: Path):
-        import sherpa_onnx as s
-        stem = 'epoch-13-avg-2-chunk-8-left-64'
-        self.spotter = s.KeywordSpotter(
-            tokens=str(model_dir / 'tokens.txt'),
-            encoder=str(model_dir / f'encoder-{stem}.int8.onnx'),
-            decoder=str(model_dir / f'decoder-{stem}.onnx'),
-            joiner=str(model_dir / f'joiner-{stem}.int8.onnx'),
-            keywords_file=str(keywords), num_threads=2,
-            keywords_threshold=0.05, keywords_score=5.0,
-        )
-        self.stream = self.spotter.create_stream()
-        asr_dir = ROOT / 'models/asr'
-        self.recognizer = s.OnlineRecognizer.from_transducer(
-            tokens=str(asr_dir / 'tokens.txt'),
-            encoder=str(asr_dir / 'encoder-epoch-99-avg-1.int8.onnx'),
-            decoder=str(asr_dir / 'decoder-epoch-99-avg-1.int8.onnx'),
-            joiner=str(asr_dir / 'joiner-epoch-99-avg-1.int8.onnx'),
-            num_threads=2, sample_rate=16000, feature_dim=80,
-            decoding_method='greedy_search', provider='cpu',
-        )
-        self.asr_stream = self.recognizer.create_stream()
-        self.stream_samples = 0
-
-    def feed(self, frame):
-        import numpy as np
-        samples = np.frombuffer(frame.data, dtype='<i2').astype(np.float32) / 32768.0
-        self.stream.accept_waveform(16000, samples)
-        events = []
-        while self.spotter.is_ready(self.stream):
-            self.spotter.decode_stream(self.stream)
-            keyword = self.spotter.get_result(self.stream)
-            if keyword:
-                print('已检测到 Astero，请说出指令。', flush=True)
-                events.append(Detected(frame.timestamp + frame.sample_count / frame.sample_rate))
-                self.spotter.reset_stream(self.stream)
-        # A bilingual transducer provides a second open-source keyword path
-        # for the user's spoken "Astero", which it often renders "ASTRO".
-        self.asr_stream.accept_waveform(16000, samples)
-        self.stream_samples += len(samples)
-        while self.recognizer.is_ready(self.asr_stream):
-            self.recognizer.decode_stream(self.asr_stream)
-            text = self.recognizer.get_result(self.asr_stream)
-            if not isinstance(text, str):
-                text = text.text
-            if not events and re.search(r'\b(?:ASTERO|ASTRO)\b', text, re.IGNORECASE):
-                print('已检测到 Astero，请说出指令。', flush=True)
-                events.append(Detected(frame.timestamp + frame.sample_count / frame.sample_rate))
-        if events or self.stream_samples >= 16000 * 8:
-            self.asr_stream = self.recognizer.create_stream()
-            self.stream_samples = 0
-        return events
-
-    def reset(self):
-        self.stream = self.spotter.create_stream()
-        self.asr_stream = self.recognizer.create_stream()
-        self.stream_samples = 0
-
-
-class SileroVAD:
-    """Feed 512-sample model windows from arbitrary 16 kHz PCM frames."""
-    def __init__(self, path: Path):
-        import sherpa_onnx as s
-        cfg = s.VadModelConfig()
-        cfg.silero_vad.model = str(path)
-        cfg.silero_vad.threshold = 0.5
-        cfg.sample_rate = 16000
-        cfg.num_threads = 1
-        self.model = s.VadModel.create(cfg)
-        self.pending = bytearray()
-        self.last = False
-
-    def is_speech(self, frame):
-        import numpy as np
-        self.pending.extend(frame.data)
-        while len(self.pending) >= 1024:
-            samples = np.frombuffer(bytes(self.pending[:1024]), dtype='<i2').astype(np.float32) / 32768.0
-            del self.pending[:1024]
-            self.last = bool(self.model.is_speech(samples))
-        return self.last
 
 
 class SenseVoice:
@@ -128,24 +39,6 @@ class SenseVoice:
         stream.accept_waveform(sample_rate, samples)
         self.recognizer.decode_stream(stream)
         return stream.result.text
-
-
-class CodexConversation:
-    """Run the user's signed-in Codex agent with no persistent session."""
-    def respond(self, text: str, session_id: str) -> str:
-        instruction = ('你是语音助手 Astero。请用用户使用的语言简洁回答，适合语音播报。'
-                       '只回答问题，不运行命令、不访问文件或调用工具。用户说：\n')
-        try:
-            result = subprocess.run(
-                ['codex', 'exec', '--ephemeral', '--skip-git-repo-check',
-                 '--sandbox', 'read-only', '-C', '/tmp', '-'],
-                input=instruction + text, text=True, capture_output=True, timeout=120,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            raise RuntimeError('GPT agent 无法启动或超时') from exc
-        if result.returncode or not result.stdout.strip():
-            raise RuntimeError(f'GPT agent 失败（退出码 {result.returncode}）')
-        return result.stdout.strip()
 
 
 class ManualWake:

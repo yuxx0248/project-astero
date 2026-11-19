@@ -1,5 +1,25 @@
 # 本机 Echo 语音回路
 
+## AST-10 常驻服务
+
+日常唤醒使用服务的 `--listen` 模式：启动后自动开启语音轮次，回答完成、无语音或等待唤醒超时后重新进入监听。固定 session 保存多轮上下文。以下命令用于本机已验收的通道 6：
+
+```sh
+/home/zuohang/.local/share/astero/venv/bin/python -m astero.service --port 8766 --channel 6 --wake-secondary-channel 5 --end-silence 0.8 --listen --session-id local-voice
+```
+
+本机用户服务模板是 `systemd/astero-local.service`，使用本仓库与已有 venv；安装至 `~/.config/systemd/user/` 后可通过 `systemctl --user enable --now astero-local.service` 管理。不要与手工启动的同端口进程或旧 `astero.live` 同时运行，以免争用 Echo 采集。
+
+当前关键词检测使用主通道 6 与辅助通道 5，共享同一模型并维护独立的重叠窗口；ASR 仍使用主通道。`--wake-secondary-channel` 可调整辅助通道，设为与主通道相同可恢复单通道。`--end-silence` 默认 0.8 秒，较长句中停顿可按需调高。调试证据见 [唤醒与延迟调试](AST-10_WAKE_LATENCY_TUNING_2026-11-18.md)。
+
+`GET http://127.0.0.1:8766/health` 的 `ready` 只表示依赖就绪；实际是否等待唤醒要看 listener 状态。省略 `--listen` 时仅提供按请求启动的单轮 API，必须 `POST /v1/turns` 才会采音：之前声学验收完成后无法直接喊醒的原因就在这里。常驻模式会串行开启新轮次，轮次之间存在设备重新打开的短暂间隔；播放回答时不接受新唤醒，尚不支持打断。
+
+按用户当前调试要求，AST-10 保存每次采集收到的完整多通道音频、派生音频和关联日志，位置为 `~/.local/share/astero/archives/`，不设 TTL、不自动清理。SQLite 保存会话、任务、记忆、知识和耗时事件。日志可通过 `journalctl --user -u astero-local.service` 查询。说单独的 Astero，稍停再说问题；真人发音识别率仍需校准。
+
+## 旧版独立诊断入口
+
+下文描述 `astero.live` 的早期运行方式；其中内存处理、不落盘和无持久会话的行为不适用于上面的 AST-10 服务。
+
 实验路径：Echo Dot 2 经 USB ADB 输出 9 通道 PCM → 本机 sherpa-onnx 关键词检测、Silero VAD 和 SenseVoice ASR → 已登录的 Codex GPT agent → 本机 Voice Bridge → 电脑默认扬声器。转录文本会发送给已登录的 GPT 服务；麦克风音频在本机内存中处理，不默认写文件。默认执行一次只读、无持久会话的 Codex 命令，提示模型只回答而不运行工具；并非通用系统操作代理。
 
 ## 本机运行
