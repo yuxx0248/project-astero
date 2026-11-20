@@ -1,0 +1,5 @@
+# Install in an isolated venv using: uv pip install --torch-backend cpu -r requirements-voice.txt
+qwen-tts==0.1.1
+torch==2.15.0+cpu
+transformers==4.57.3
+soundfile==0.14.0

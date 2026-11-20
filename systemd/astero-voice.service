@@ -1,0 +1,16 @@
+[Unit]
+Description=Project Astero Cassandra voice synthesis and playback
+After=pipewire-pulse.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/project-astero
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/share/astero/voice-design-venv/bin/python -m voice_bridge.clone_service --profile cassandra --port 8767 --threads 6 --model-dir %h/.local/share/astero/models/voice-base --data-root %h/.local/share/astero
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=260
+UMask=0077
+
+[Install]
+WantedBy=default.target

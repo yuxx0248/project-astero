@@ -20,6 +20,7 @@ from astero.service.app import AsteroService, TurnRequest
 from astero.service.http import LocalAsteroHTTPServer
 from astero.service.local_voice import LocalVoiceConfig, LocalVoiceTurnExecutor
 from astero.service.listener import ResidentListener
+from astero.speech.voice_profile import DEFAULT_VOICE_PROFILE
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,9 +34,13 @@ class LocalServiceConfig:
     session_id: str = "local-voice"
     gain: float = 16.0
     end_silence_seconds: float = 0.8
-    voice_bridge_url: str = "http://127.0.0.1:8765"
+    voice_profile: str = DEFAULT_VOICE_PROFILE
+    voice_bridge_url: str | None = None
 
     def __post_init__(self) -> None:
+        voice_config = LocalVoiceConfig(voice_profile=self.voice_profile,
+                                       voice_bridge_url=self.voice_bridge_url)
+        object.__setattr__(self, "voice_bridge_url", voice_config.voice_bridge_url)
         if not self.session_id.strip():
             raise ValueError("session_id must be nonempty")
         if self.host not in {"127.0.0.1", "localhost", "::1"}:
@@ -74,6 +79,7 @@ class LocalService:
                              channel=self.config.channel, gain=self.config.gain,
                              wake_secondary_channel=self.config.wake_secondary_channel,
                              end_silence_seconds=self.config.end_silence_seconds,
+                             voice_profile=self.config.voice_profile,
                              voice_bridge_url=self.config.voice_bridge_url),
         )
         event_recorder = TraceRecorder(sink=_StoreEventSink(self.store))
@@ -157,7 +163,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gain", type=float, default=16.0)
     parser.add_argument("--end-silence", type=float, default=0.8,
                         help="endpoint silence in seconds after VAD releases speech")
-    parser.add_argument("--voice-bridge-url", default="http://127.0.0.1:8765")
+    parser.add_argument("--voice-profile", choices=(DEFAULT_VOICE_PROFILE, "bridge-default"),
+                        default=DEFAULT_VOICE_PROFILE,
+                        help="selected repository voice, or explicitly use the legacy bridge voice")
+    parser.add_argument("--voice-bridge-url", default=None,
+                        help="override the profile endpoint (B defaults to port 8767; bridge-default to 8765)")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     try:
@@ -168,6 +178,7 @@ def main(argv: list[str] | None = None) -> int:
             end_silence_seconds=args.end_silence,
             listen=args.listen, session_id=args.session_id,
             voice_bridge_url=args.voice_bridge_url,
+            voice_profile=args.voice_profile,
         ))
     except (OSError, ValueError, RuntimeError) as exc:
         logging.getLogger("astero.service").error("service initialization failed: %s", type(exc).__name__)

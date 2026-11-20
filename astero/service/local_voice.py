@@ -24,7 +24,10 @@ from astero.orchestrator import Orchestrator, OrchestratorConfig, TurnResult, Tu
 from astero.persistence import AsteroStore
 from astero.speech.asr import SherpaOnnxASR, ZipformerConfig
 from astero.speech.endpoint import EndpointCollector, EndpointConfig, EndpointKind
-from astero.speech.voice_bridge import VoiceBridgeClient, VoiceBridgeConfig
+from astero.speech.voice_bridge import (
+    VoiceBridgeClient, VoiceBridgeConfig, VoiceBridgeProfileMismatchError,
+)
+from astero.speech.voice_profile import DEFAULT_VOICE_PROFILE
 
 from astero.live import CodexConversation, SenseVoice, SherpaKeyword
 from astero.speech.live_vad import SileroVAD
@@ -39,11 +42,17 @@ class LocalVoiceConfig:
     wake_secondary_channel: int = 5
     gain: float = 16.0
     max_listen_seconds: float = 120.0
-    playback_timeout_seconds: float = 180.0
+    playback_timeout_seconds: float = 300.0
     end_silence_seconds: float = 0.8
-    voice_bridge_url: str = "http://127.0.0.1:8765"
+    voice_profile: str = DEFAULT_VOICE_PROFILE
+    voice_bridge_url: str | None = None
 
     def __post_init__(self) -> None:
+        if self.voice_profile not in {DEFAULT_VOICE_PROFILE, "bridge-default"}:
+            raise ValueError("unknown voice profile")
+        if self.voice_bridge_url is None:
+            port = 8767 if self.voice_profile == DEFAULT_VOICE_PROFILE else 8765
+            object.__setattr__(self, "voice_bridge_url", f"http://127.0.0.1:{port}")
         if not 0 <= self.channel <= 6:
             raise ValueError("channel must select microphone channel 0 through 6")
         if not 0 <= self.wake_secondary_channel <= 6:
@@ -76,7 +85,13 @@ class LocalVoiceTurnExecutor:
                  *, bridge: VoiceBridgeClient | None = None) -> None:
         self.store = store
         self.config = config or LocalVoiceConfig()
-        self.bridge = bridge or VoiceBridgeClient(VoiceBridgeConfig(base_url=self.config.voice_bridge_url))
+        selected_profile = (None if self.config.voice_profile == "bridge-default"
+                            else self.config.voice_profile)
+        self.bridge = bridge or VoiceBridgeClient(VoiceBridgeConfig(
+            base_url=self.config.voice_bridge_url,
+            timeout_seconds=self.config.playback_timeout_seconds,
+            voice=selected_profile, expected_voice_profile=selected_profile,
+        ))
         self._voice_lock = threading.Lock()
         self._cancel = threading.Event()
         self._active_pump = None
@@ -124,14 +139,19 @@ class LocalVoiceTurnExecutor:
         if self._startup_error:
             dependencies["startup_error"] = self._startup_error
         try:
-            self.bridge.health()
+            health = self.bridge.health()
+            if (self.config.voice_profile != "bridge-default"
+                    and (not isinstance(health, Mapping)
+                         or health.get("voice_profile") != self.config.voice_profile)):
+                raise VoiceBridgeProfileMismatchError("tts_voice_profile_mismatch")
             dependencies["tts"] = "ready"
         except Exception as exc:
             dependencies["tts"] = type(exc).__name__
             ready = False
         if self.wake is None or self.asr is None:
             ready = False
-        return {"ready": ready, "dependencies": dependencies}
+        return {"ready": ready, "dependencies": dependencies,
+                "voice_profile": self.config.voice_profile}
 
     def activity(self) -> dict[str, object]:
         return dict(self._activity)
@@ -158,6 +178,8 @@ class LocalVoiceTurnExecutor:
             return TurnResult(TurnStatus.CANCELLED)
         if self.wake is None or self.asr is None:
             return TurnResult(TurnStatus.FAILED, error="voice_runtime_not_ready")
+        if not self.readiness()["ready"]:
+            return TurnResult(TurnStatus.FAILED, error="voice_runtime_not_ready")
         if not self._voice_lock.acquire(blocking=False):
             return TurnResult(TurnStatus.FAILED, error="voice_capture_busy")
         try:
@@ -183,6 +205,7 @@ class LocalVoiceTurnExecutor:
             "wake_channels": list(dict.fromkeys((self.config.channel, self.config.wake_secondary_channel))),
             "gain": self.config.gain,
             "input_kind": "live_echo_microphone",
+            "voice_profile": self.config.voice_profile,
         })
         context = TraceContext(request.trace_id, request.turn_id,
                                request.session_id, capture_id)
@@ -223,7 +246,8 @@ class LocalVoiceTurnExecutor:
                     playback = _TracePlayback(self.bridge, recorder, context,
                                               lambda text: writer.append_debug_payload(
                                                   capture_id, request.turn_id, "tts_request",
-                                                  {"text": text}), frame_source)
+                                                  {"text": text,
+                                                   "voice_profile": self.config.voice_profile}), frame_source)
                     orchestrator = Orchestrator(
                         _TraceWake(self.wake, recorder, context), endpoint, asr,
                         conversation, playback,
