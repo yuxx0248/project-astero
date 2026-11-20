@@ -1,3 +1,5 @@
+> **2026-11-19 组件归属说明（迁移分支）**：此文件原有的审计和声学证据保持历史有效；今后的 Voice Bridge 服务端与通用客户端 SDK 都由 [voice-bridge](https://github.com/yuxx0248/voice-bridge) 负责。Astero 将仅保留 `astero.speech.voice_bridge` 兼容导入和本项目自己的会话编排逻辑。变更和部署前置条件见 [VOICE_BRIDGE_MIGRATION.md](VOICE_BRIDGE_MIGRATION.md)，不可将旧的部署审计当作 SDK 已安装的证据。
+
 # 本机 Voice Bridge 更新 — 2026-11-18
 
 当前阶段已改为先在 USB 连接 Echo Dot 2 的本机测试，不依赖 Xeon。真实设备已通过 ADB 验证 root、PCM 采集和一次合成语音声学回路；Voice Bridge 在本机健康运行。具体实现、结果和仍未验证的唤醒可靠性见 [本机语音回路说明](LOCAL_LIVE_RUN.md)。
