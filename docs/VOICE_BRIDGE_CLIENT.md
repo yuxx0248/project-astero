@@ -14,6 +14,12 @@ This branch changes a Python import and is not safe to merge or deploy before in
 /home/zuohang/.local/share/astero/venv/bin/python -m unittest discover -s tests -v
 ```
 
+Astero declares the SDK as a direct, immutable Git commit dependency in
+`pyproject.toml`. A clean deployment install with `python -m pip install -e .`
+therefore resolves the same SDK without relying on the current directory or
+`PYTHONPATH`. For a local paired checkout, install that Voice Bridge checkout
+editable first, then run `python -m pip install --no-deps -e .`.
+
 From the Voice Bridge repository, also run `python3 -m unittest discover -s tests -v`. Finally run **one explicit real A16/Echo end-to-end speech turn** and verify the listener resumes and archives are complete before enabling the changed user service. Do not modify the running service or its virtualenv during the migration without a rollback path.
 
 The runtime still expects local loopback `http://127.0.0.1:8765`. Voice Bridge accepts HTTP 202 as **queued**, not success. Its `completed` status means the player exited successfully, not verified audibility. Its API has no cancel endpoint; a timed-out Astero call may leave a queued or playing announcement.

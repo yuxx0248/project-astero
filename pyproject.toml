@@ -7,7 +7,9 @@ name = "project-astero"
 version = "0.0.1"
 description = "Raspberry Pi 4 voice portal scaffold"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "voice-bridge-local @ git+https://github.com/yuxx0248/voice-bridge.git@9e18abb10be617de51c808fd950c517111238d0a",
+]
 
 [tool.setuptools.packages.find]
 include = ["astero*"]
