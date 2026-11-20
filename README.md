@@ -4,6 +4,8 @@
 
 > **Status: scaffold / hardware discovery.** Plan A is the accepted target architecture, **not an implemented or validated audio system**. The owner reports successful Echo Dot 2 rooting; audio capture/streaming and Xeon Bluetooth output remain unverified.
 
+> **Voice Bridge 组件归属（2026-11-19 迁移分支）**：TTS、播报队列、播放器和通用 Python SDK 由 [voice-bridge](https://github.com/yuxx0248/voice-bridge) 仓库维护；Astero 只拥有会话与语音编排，并通过兼容导入使用 `voice_bridge.client`。合并本迁移前需先将 Voice Bridge SDK 安装到 Astero 的 venv。详见 [迁移步骤](docs/VOICE_BRIDGE_MIGRATION.md)。这不是已经部署完成的状态。
+
 ## Deployment priority (2026-11-18)
 
 ### Plan A — Xeon server-first (primary)
